@@ -179,7 +179,7 @@ namespace ChatServer
             var listener = new TcpListener(IPAddress.Any, m_port);
 
             // Start listening.
-            listener.Start();
+            listener.Start(1000);
 
             Log.LogDebug($"Started listening on port {m_port}");
 
@@ -200,7 +200,11 @@ namespace ChatServer
                         Log.LogDebug($"Accepted a new client. Count: {m_clients.Count}");
 
                         // Handler loop - start in the background.
-                        handler.RunAsync().ContinueWith(t => RemoveHandler(handler)).Forget(false);
+                        Task.Run(async () =>
+                        {
+                            await handler.RunAsync();
+                            RemoveHandler(handler);
+                        }).Forget(false);
                     }
                     catch (Exception e)
                     {

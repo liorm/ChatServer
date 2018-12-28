@@ -6,6 +6,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="names.txt" />
+    <None Remove="sentences.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="names.txt" />
+    <EmbeddedResource Include="sentences.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Utils\Utils.csproj" />
   </ItemGroup>
 

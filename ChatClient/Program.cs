@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -63,7 +64,7 @@ namespace ChatClient
 
     class Program
     {
-        static async Task ClientCore(string myName, Func<int, string> getMsgCallback)
+        static async Task ClientCore(string myName, Func<int, Task<string>> getMsgCb, Action<Msg> writeMsgCb)
         {
             var client = new TcpClient();
             try
@@ -77,12 +78,12 @@ namespace ChatClient
             }
 
             // Start background receive loop; close socket upon error.
-            ReadLoopAsync(client).Forget(e => client.Close());
+            ReadLoopAsync(client, writeMsgCb).Forget(e => client.Close());
 
             var stream = client.GetStream();
             while (client.Connected)
             {
-                var text = getMsgCallback(1000);
+                var text = await getMsgCb(1000).ConfigureAwait(false);
                 if (text == null)
                     continue;
 
@@ -110,7 +111,7 @@ namespace ChatClient
             }
         }
 
-        private static async Task ReadLoopAsync(TcpClient client)
+        private static async Task ReadLoopAsync(TcpClient client, Action<Msg> writeMsgCb)
         {
             var stream = client.GetStream();
 
@@ -131,9 +132,7 @@ namespace ChatClient
                     throw new InvalidOperationException($"Failed to read whole message (read: {readSize}, size: {msgSize})");
 
                 var msg = Msg.Parse(msgBuffer);
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine(msg);
-                Console.ForegroundColor = ConsoleColor.Gray;
+                writeMsgCb(msg);
             }
         }
 
@@ -144,13 +143,50 @@ namespace ChatClient
             if (name == "--bot")
             {
                 var count = int.Parse(args[1]);
-                // TODO: Implement simulation mode.
+
+                var prng = new Random();
+
+                var tasks = Enumerable.Range(0, count).Select(i => ClientCore(Bot.RandomName(), async timeout =>
+                {
+                    await Task.Delay(prng.Next(500-300, 500+300));
+                    return Bot.RandomSentence();
+                }, m => {})).ToList();
+
+                Task.WhenAll(tasks).Wait();
+            }
+            else if (name == "--bench")
+            {
+                Stopwatch watch = Stopwatch.StartNew();
+                int counter = 0;
+
+                // Run a single client
+                ClientCore(name, async timeout =>
+                {
+                    await Task.Delay(timeout);
+                    return null;
+                }, m =>
+                {
+                    ++counter;
+                    if (watch.ElapsedMilliseconds >= 1000)
+                    {
+                        Console.WriteLine($"Got {(double)counter / watch.ElapsedMilliseconds * 1000:F2}/s");
+                        counter = 0;
+                        watch.Restart();
+                    }
+                }).Wait();
             }
             else
             {
                 // Run a single client
-                ClientCore(name, timeout => Console.ReadLine()).Wait();
+                ClientCore(name, timeout => Task.FromResult(Console.ReadLine()), OutputMessage).Wait();
             }
+        }
+
+        private static void OutputMessage(Msg msg)
+        {
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine(msg);
+            Console.ForegroundColor = ConsoleColor.Gray;
         }
     }
 }
