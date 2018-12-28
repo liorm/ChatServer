@@ -15,10 +15,7 @@ namespace ChatClient
         public string Name { get; set; }
         public string Text { get; set; }
 
-        public override string ToString()
-        {
-            return $"{Name}: {Text}";
-        }
+        public override string ToString() => $"{Name}: {Text}";
 
         public static Msg Parse(byte[] buffer)
         {
@@ -40,7 +37,7 @@ namespace ChatClient
                     Text = Enc.GetString(buffer, 2 + nameSize, textSize)
                 };
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // Failed to parse buffer?
                 return null;
@@ -66,7 +63,7 @@ namespace ChatClient
 
     class Program
     {
-        static async Task ClientCore(string myName, Func<string> getMsgCallback)
+        static async Task ClientCore(string myName, Func<int, string> getMsgCallback)
         {
             var client = new TcpClient();
             try
@@ -85,7 +82,10 @@ namespace ChatClient
             var stream = client.GetStream();
             while (client.Connected)
             {
-                var text = getMsgCallback();
+                var text = getMsgCallback(1000);
+                if (text == null)
+                    continue;
+
                 var msg = new Msg()
                 {
                     Name = myName,
@@ -149,7 +149,7 @@ namespace ChatClient
             else
             {
                 // Run a single client
-                ClientCore(name, Console.ReadLine).Wait();
+                ClientCore(name, timeout => Console.ReadLine()).Wait();
             }
         }
     }
