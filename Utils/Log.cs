@@ -32,9 +32,9 @@ namespace Utils
         public static void LogError(Exception e, string msg = null)
         {
             if (msg != null)
-                LogError($"{msg}: {e.Message}");
+                LogError($"{msg}: {e.Message}\n{e.StackTrace}");
             else
-                LogError($"Exception '{e.GetType().Name}': {e.Message}");
+                LogError($"Exception '{e.GetType().Name}': {e.Message}\n{e.StackTrace}");
         }
     }
 }

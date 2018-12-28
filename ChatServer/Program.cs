@@ -66,7 +66,11 @@ namespace ChatServer
                             break;
 
                         // Send data on the socket.
-                        var sentSize = await m_socket.SendAsync(msg, SocketFlags.None).ConfigureAwait(false);
+                        var msgSizeBuffer = BitConverter.GetBytes((ushort)msg.Length);
+                        var sentSize = await m_socket.SendAsync(msgSizeBuffer, SocketFlags.None).ConfigureAwait(false);
+                        if (sentSize != msgSizeBuffer.Length)
+                            throw new InvalidOperationException($"Failed to send message size (sent: {sentSize}, size: {msgSizeBuffer.Length})");
+                        sentSize = await m_socket.SendAsync(msg, SocketFlags.None).ConfigureAwait(false);
                         
                         // Might be disposed after async operation completes.
                         if (m_disposed)
@@ -108,6 +112,10 @@ namespace ChatServer
 
                         // Might be disposed after async operation completes.
                         if (m_disposed)
+                            return;
+
+                        // Socket closed?
+                        if (readSize == 0)
                             return;
 
                         if (readSize != 2)
