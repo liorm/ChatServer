@@ -1,4 +1,5 @@
 ﻿using System;
+using Utils;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -9,56 +10,6 @@ using System.Threading.Tasks;
 
 namespace ChatServer
 {
-    static class TaskExtensions
-    {
-        public static void Forget(this Task task, bool rethrow = true)
-        {
-            task.ContinueWith(t =>
-            {
-                if (t.IsFaulted)
-                {
-                    Log.LogError(t.Exception, "Unhandled task exception");
-                    if (rethrow)
-                        throw new AggregateException(t.Exception);
-                }
-            });
-        }
-    }
-
-    /// <summary>
-    /// Poormans logging facility.
-    /// </summary>
-    static class Log
-    {
-        private static readonly object LogLock = new object();
-
-        public static void LogDebug(string msg)
-        {
-            lock (LogLock)
-            {
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine("DEBUG: " + msg);
-            }
-        }
-
-        public static void LogError(string msg)
-        {
-            lock (LogLock)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("ERROR: " + msg);
-            }
-        }
-
-        public static void LogError(Exception e, string msg = null)
-        {
-            if (msg != null)
-                LogError($"{msg}: {e.Message}");
-            else
-                LogError($"Exception '{e.GetType().Name}': {e.Message}");
-        }
-    }
-
     class Server
     {
         public Server(ushort port = 5656)
@@ -245,8 +196,8 @@ namespace ChatServer
 
                         Log.LogDebug($"Accepted a new client. Count: {m_clients.Count}");
 
-                        // Handler loop - start and forget.
-                        handler.RunAsync().ContinueWith(t => RemoveHandlerCallback(handler)).Forget();
+                        // Handler loop - start in the background.
+                        handler.RunAsync().ContinueWith(t => RemoveHandlerCallback(handler)).Forget(false);
                     }
                     catch (Exception e)
                     {
@@ -271,7 +222,13 @@ namespace ChatServer
             using (var enumerator = m_clients.GetEnumerator())
             {
                 while (enumerator.MoveNext())
+                {
+                    // Ignore caller.
+                    if (enumerator.Current.Key == handler)
+                        continue;
+
                     enumerator.Current.Key.Enqueue(msg);
+                }
             }
         }
     }
