@@ -58,7 +58,7 @@ namespace ChatClient
 
             // Copy the buffers.
             Buffer.BlockCopy(nameBuffer, 0, result, 2, nameBuffer.Length);
-            Buffer.BlockCopy(textBuffer, 0, result, 2 + nameBuffer.Length, nameBuffer.Length);
+            Buffer.BlockCopy(textBuffer, 0, result, 2 + nameBuffer.Length, textBuffer.Length);
 
             return result;
         }
