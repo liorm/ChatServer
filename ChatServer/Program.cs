@@ -21,16 +21,14 @@ namespace ChatServer
 
         class SocketHandler : IDisposable
         {
-            public SocketHandler(Socket socket, Action<SocketHandler, byte[]> newMessageCallback, Action<SocketHandler> onErrorCallback)
+            public SocketHandler(Socket socket, Action<SocketHandler, byte[]> newMessageCallback)
             {
                 m_socket = socket;
                 m_newMessageCallback = newMessageCallback;
-                m_onErrorCallback = onErrorCallback;
             }
 
             private readonly Socket m_socket;
             private readonly Action<SocketHandler, byte[]> m_newMessageCallback;
-            private readonly Action<SocketHandler> m_onErrorCallback;
 
             private readonly ConcurrentQueue<byte[]> m_msgQueue = new ConcurrentQueue<byte[]>();
             private readonly ManualResetEventSlim m_msgAddedEvent = new ManualResetEventSlim();
@@ -142,9 +140,6 @@ namespace ChatServer
                         // Close socket upon error.
                         m_socket.Close();
 
-                        // Notify the server of an error
-                        m_onErrorCallback(this);
-
                         // Finish execution.
                         return;
                     }
@@ -189,15 +184,15 @@ namespace ChatServer
                     {
                         // Wait for connection.
                         var socket = await listener.AcceptSocketAsync().ConfigureAwait(false);
-                        var handler = new SocketHandler(socket, MessageCallback, RemoveHandlerCallback);
+                        var handler = new SocketHandler(socket, MessageCallback);
 
                         // Add to the list of handlers.
-                        m_clients.AddOrUpdate(handler, null, (k, v) => throw new InvalidOperationException());
+                        m_clients.AddOrUpdate(handler, (object)null, (k, v) => throw new InvalidOperationException());
 
                         Log.LogDebug($"Accepted a new client. Count: {m_clients.Count}");
 
                         // Handler loop - start in the background.
-                        handler.RunAsync().ContinueWith(t => RemoveHandlerCallback(handler)).Forget(false);
+                        handler.RunAsync().ContinueWith(t => RemoveHandler(handler)).Forget(false);
                     }
                     catch (Exception e)
                     {
@@ -208,12 +203,11 @@ namespace ChatServer
             }
         }
 
-        private void RemoveHandlerCallback(SocketHandler handler)
+        private void RemoveHandler(SocketHandler handler)
         {
             // Remove the dead handler.
             m_clients.TryRemove(handler, out var v);
-
-            Log.LogDebug($"Removed a new client. Count: {m_clients.Count}");
+            Log.LogDebug($"Removed a client. Count: {m_clients.Count}");
         }
 
         private void MessageCallback(SocketHandler handler, byte[] msg)
